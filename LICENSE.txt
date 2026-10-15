@@ -1,0 +1,36 @@
+
+## Summary
+
+I've built the complete MavunoIQ backend across all 7 stages, with a fully modular architecture, real MongoDB models, real business logic, provider abstractions, tests, seed data, admin provisioning, Swagger docs, and a comprehensive README.
+
+### What's complete and functional
+
+**Stage 1 — Foundation:** `package.json`, `tsconfig`, `.env.example`, env validation with Zod, Pino logger with secret redaction, MongoDB connection with monitoring, centralized `AppError`, error handler (Zod/Mongoose/duplicate-key-aware), request IDs, async handler, rate limiters, security middleware (Helmet/CORS/compression/body limits), money utilities (integer cents), idempotency helper, text sanitizer, health endpoints, graceful shutdown.
+
+**Stage 2 — Auth & users:** Register (FARMER/BUYER only — ADMIN blocked), login, refresh with rotating refresh tokens stored hashed server-side plus reuse detection and family revocation, logout, email verification, password reset/change, profile updates with strict allowlisting, account deactivation, RBAC middleware, `requireAdmin`.
+
+**Stage 3 — Profiles & marketplace:** FarmerProfile, BuyerProfile, Farm (with coordinate hiding from non-owners), Category, Product (indexed, text search, status enum, integer-cent pricing), full product CRUD with ownership checks and archive-on-delete.
+
+**Stage 4 — Transactions:** Order model with `orderNumber`, embedded items, status history, legal state machine (`PENDING → ACCEPTED → ... → COMPLETED`), inventory reservation with `withTransaction`, idempotency-key support, role-correct transitions (farmer accepts, buyer completes), messaging (Conversations + Messages with participant checks), notifications (in-app + email hook), reviews (only for completed orders, unique per reviewer+order, recomputes averages).
+
+**Stage 5 — Intelligence:** MarketPrice model + prices/history/compare/recommendation endpoints (recommendation returns min/max/suggested + confidence + `isDemo` label + optional real-AI narrative only when a real AI provider is configured). Weather provider abstraction + crop-advice service (risks/actions/affected crops/limitations). AI advisor with `AIConversation`/`AIMessage` persistence, conversation CRUD, rate limiting, system prompt hardening, market context injection. Crop analysis (Multer + MIME/size limits + storage provider) with explicitly-labelled demo response. Demand summary returning measured counts only and an `insufficient_data` status rather than fabricated precision.
+
+**Stage 6 — Payments:** `PaymentProvider` interface, DemoPaymentProvider, and a real `MpesaPaymentProvider` implementing Daraja OAuth + STK Push + callback parsing (Amount→cents, receipt, phone). Payment model, `POST /mpesa/stk-push`, `POST /mpesa/callback` (idempotent, updates Order payment status, notifies both parties), `GET /payments/:id`.
+
+**Stage 7 — Admin, docs, seed, tests:** Admin stats/users/deactivate with `AuditLog`, analytics (GMV, orders), `provision-admin` script (never seeds a default admin), demo `seed.ts` (Kenyan counties, KES, all records marked demo), Vitest + Supertest + `mongodb-memory-server` tests (auth flows, invalid credentials, refresh, admin-registration rejection), OpenAPI spec served at `/api/docs`, full README with frontend integration guide.
+
+### Notable design decisions
+
+- **Money is stored as integer cents** everywhere (`priceCents`, `totalCents`) to avoid float issues; helpers `toCents`/`fromCents`/`multiplyCents`.
+- **Never trust the frontend** for totals, payment status, roles, or verification status — all enforced server-side.
+- **Every optional provider** has a demo implementation flagged `isDemo: true`, and the health endpoint reports which providers are active vs disabled.
+- **Refresh token reuse detection** revokes the entire token family on suspicious use.
+
+### What remains as clearly-labelled stubs
+
+1. **S3 storage** — `StorageProvider` interface and local implementation exist; add `@aws-sdk/client-s3` and a class in `src/integrations/storage/index.ts` to enable.
+2. **Real crop-disease model** — the endpoint exists, uploads work, but no model is configured so it returns a labelled demo response.
+3. **Real statistical demand forecasting** — returns measured counts and an `insufficient_data` status when data is thin, as required by the spec.
+4. **Socket.IO** — REST messaging is fully functional; Socket.IO would be additive.
+
+To run: `npm install && cp .env.example .env` (set the two JWT secrets and `MONGODB_URI`), then `npm run seed && npm run dev`. Tests: `npm test`. Docs: `http://localhost:5000/api/docs`.
